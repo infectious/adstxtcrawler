@@ -1,0 +1,7 @@
+pytest==3.5.0
+pytest-cov==2.5.1
+pytest-mock==1.7.1
+mypy==0.580
+ipython==6.2.1
+pytest-asyncio==0.8.0
+asynctest==0.12.0
