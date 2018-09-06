@@ -1,6 +1,6 @@
-# ads.txt crawler
+# ads.txt crawler [![Build Status](https://travis-ci.org/infectious/adstxtcrawler.svg?branch=master)](https://travis-ci.org/infectious/adstxtcrawler)
 
-## Installation
+### Installation
 
 This crawler relies on you having the latest Python installed and accessible
 on your path.  You'll need to setup a virtual environment path to isolate deps.
@@ -19,7 +19,7 @@ Data is written to a MariaDB/MySQL instance as provided by the database URI
 configurable.  Postgres is not supported at this instance but PRs are welcome.
 
 
-## Running
+### Running
 
 ```sh
 adstxt --file --file_path=/tmp/adstxt_domains
@@ -38,7 +38,7 @@ via the following
 adstxt --es
 ```
 
-## Configuration
+### Configuration
 
 Configuration is done either through CLI paramaters or using environment
 variables.  Required configuration is variable dependent upon configuration.
@@ -59,13 +59,13 @@ Configuration options available are.
 | Sentry URI                      | SENTRY_DSN            | Sentry URL to write any exception data to.                                            |
 | Git Hash                        | GIT_HASH              | Git version to report sentry exceptions as.                                           |
 
-## Developing
+### Developing
 
 Setup a new virtualenv, and run the following to get started.
 
 ```sh
 python setup.py develop
-mypy --strict-optional adstxt/main.py
+mypy adstxt/main.py --ignore-missing-imports --strict-optional
 # Run tests including integration suite.
 pytest -vv --integration
 ```
@@ -74,20 +74,20 @@ All tests should return green.  Please don't open a PR with failing tests
 unless you're unsure why they're failing.
 
 
-## Models
+### Models
 
 SQLAlchemy Models are available via [models](./adstxt/models.py).
 
 These are importable and can be used instead of writing raw sql upstream.
 
 
-## Bugs
+### Bugs
 
 Please submit any bugs you find here, we've done our best efforts to not
 include any, but I'm sure some exist.
 
 
-## Missing features
+### Missing features
 
 1. Async database support will greatly improve the throughput vs writing to the
     database in a single background thread.

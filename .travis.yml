@@ -1,0 +1,12 @@
+language: python
+python:
+  - "3.6"
+
+install:
+  - "export CI="
+  - "python setup.py develop"
+
+script:
+  - "mypy adstxt/main.py --ignore-missing-imports --strict-optional"
+  - "pytest -vv --integration --cov=adstxt --cov-fail-under 80 tests/"
+
