@@ -1,4 +1,5 @@
 import datetime
+import json
 import os
 import logging
 import time
@@ -75,7 +76,7 @@ def adstxt_integration(mocker, caplog, tmpdir, request):
                                      False,
                                      db_uri,
                                      es_uri=es_uri,
-                                     es_query=ES_QUERY,
+                                     es_query=json.dumps(ES_QUERY),
                                      es_index=idb_test_index_for_es,
                                      crawler_id=USER_AGENT)
     # If this isn't true, then setup something we can run locally.
@@ -93,7 +94,7 @@ def adstxt_integration(mocker, caplog, tmpdir, request):
                                      False,
                                      db_uri,
                                      es_uri='localhost',
-                                     es_query=ES_QUERY,
+                                     es_query=json.dumps(ES_QUERY),
                                      es_index=idb_test_index_for_es,
                                      crawler_id=USER_AGENT)
         mock_es = mocker.patch.object(crawler, '_query_for_domains')
@@ -202,3 +203,4 @@ def test_integration_verify_process_domain_gc(caplog, adstxt_integration):
             domain_id=1, active=False).all()
 
     assert len(records) == 2
+
