@@ -168,3 +168,79 @@ def test_fetch_from_file(adstxtcrawler, tmpdir):
     domains = adstxtcrawler._fetch_from_file(domains_file.strpath)
 
     assert expected_domains == domains
+
+
+
+def test_deactivate_reactivate(adstxtcrawler, caplog):
+    caplog.set_level(logging.DEBUG)
+    adstxtcrawler._bootstrap_db()
+
+    correct = FetchResponse(
+    'weather.com',
+    datetime.datetime(2018, 3, 26, 10, 55, 59, 661410),
+    True,
+        (
+            'amazon-adsystem.com, 1004, DIRECT',
+        )
+    )
+    mistake = FetchResponse(
+    'weather.com',
+    datetime.datetime(2018, 3, 26, 10, 55, 59, 661410),
+    True,
+        (
+            'aamazon-adsystem.com, 1004, DIRECT',  # Note the aamazon-adsystem...
+        )
+    )
+    fixed = FetchResponse(
+    'weather.com',
+    datetime.datetime(2018, 3, 26, 10, 55, 59, 661410),
+    True,
+        (
+            'amazon-adsystem.com, 1004, DIRECT',
+        )
+    )
+
+    # Populate the domains table.
+    adstxtcrawler._check_viability('weather.com')
+
+    session = adstxtcrawler._session()
+
+    adstxtcrawler.process_domain(correct)
+    # Assert it's inserted.
+    correct_record = session.query(
+        models.Record.supplier_domain,
+        models.Record.pub_id,
+        models.Record.supplier_relationship,
+        models.Record.cert_authority,
+        models.Record.active).one_or_none()
+    logging.info(correct_record)
+    assert correct_record.active is True
+
+    adstxtcrawler.process_domain(mistake)
+    # Assert it's now inactive.
+    mistake_record = session.query(
+        models.Record.supplier_domain,
+        models.Record.pub_id,
+        models.Record.supplier_relationship,
+        models.Record.cert_authority,
+        models.Record.active).filter_by(
+            supplier_domain='amazon-adsystem.com'
+    ).one_or_none()
+    logging.info(mistake_record)
+    # Record should be disable now.
+    assert mistake_record.active is False
+
+    adstxtcrawler.process_domain(fixed)
+    # Assert it's reactivated.
+    fixed_record = session.query(
+        models.Record.supplier_domain,
+        models.Record.pub_id,
+        models.Record.supplier_relationship,
+        models.Record.cert_authority,
+        models.Record.active).filter_by(
+            supplier_domain='amazon-adsystem.com'
+    ).one_or_none()
+    logging.info(fixed_record)
+    # Check that's again set to active.
+    assert fixed_record.active is True
+

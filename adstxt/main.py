@@ -192,18 +192,21 @@ class AdsTxtCrawler:
                         models.Record.supplier_domain,
                         models.Record.pub_id,
                         models.Record.supplier_relationship,
-                        models.Record.cert_authority).filter_by(
+                        models.Record.cert_authority,
+                        models.Record.active).filter_by(
                             domain=db_domain,
                             supplier_domain=processed_row.supplier_domain,
                             pub_id=processed_row.pub_id,
                             supplier_relationship=processed_row.supplier_relationship
                     ).one_or_none()
+
                 # Something in the query was bad. Skip to the next record.
                 except SQLAlchemyError as excpt:
                     LOG.exception('Unprocessible row. %r is bad due to %r',
                                   processed_row, excpt)
                     continue
 
+                # If the record isn't present insert with fetchdata.
                 if not record_exists:
                     db_record = models.Record(
                         domain_id=db_domain.id,
@@ -218,8 +221,19 @@ class AdsTxtCrawler:
                         session.add(db_record)
                     except DBAPIError:
                         LOG.error('Unable to insert... %r', db_record)
+                # If the record does exist check to ensure it's active.
                 else:
-                    LOG.debug('Record already exists in database, skipping.')
+                    # It's not active so reactivate the record.
+                    if not record_exists.active:
+                        session.query(
+                            models.Record).filter_by(
+                                domain=db_domain,
+                                supplier_domain=processed_row.supplier_domain,
+                                pub_id=processed_row.pub_id,
+                                supplier_relationship=processed_row.supplier_relationship
+                        ).one().active = True
+                        LOG.debug(
+                            'Record was found to be inactive, reactivating...')
 
             elif isinstance(processed_row, transform.AdsVariable):
                 # Check for presence of variable in Variable table.
@@ -398,3 +412,4 @@ class AdsTxtCrawler:
             LOG.info('Done processing current available domains.')
             # There's no sleeping as this process takes ages.
             # Just loop round and update anything that's required.
+
