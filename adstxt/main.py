@@ -189,15 +189,12 @@ class AdsTxtCrawler:
                 # If if does then skip to the next record.
                 try:
                     record_exists = session.query(
-                        models.Record.supplier_domain,
-                        models.Record.pub_id,
-                        models.Record.supplier_relationship,
-                        models.Record.cert_authority,
-                        models.Record.active).filter_by(
+                        models.Record).filter_by(
                             domain=db_domain,
                             supplier_domain=processed_row.supplier_domain,
                             pub_id=processed_row.pub_id,
-                            supplier_relationship=processed_row.supplier_relationship
+                            supplier_relationship=processed_row.supplier_relationship,
+                            cert_authority=processed_row.cert_authority
                     ).one_or_none()
 
                 # Something in the query was bad. Skip to the next record.
@@ -225,13 +222,8 @@ class AdsTxtCrawler:
                 else:
                     # It's not active so reactivate the record.
                     if not record_exists.active:
-                        session.query(
-                            models.Record).filter_by(
-                                domain=db_domain,
-                                supplier_domain=processed_row.supplier_domain,
-                                pub_id=processed_row.pub_id,
-                                supplier_relationship=processed_row.supplier_relationship
-                        ).one().active = True
+                        record_exists.active = True
+                        session.commit()
                         LOG.debug(
                             'Record was found to be inactive, reactivating...')
 
@@ -412,4 +404,3 @@ class AdsTxtCrawler:
             LOG.info('Done processing current available domains.')
             # There's no sleeping as this process takes ages.
             # Just loop round and update anything that's required.
-
