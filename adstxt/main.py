@@ -4,6 +4,7 @@ import json
 import logging
 import queue
 import threading
+import time
 from typing import List
 
 from elasticsearch import Elasticsearch
@@ -399,8 +400,11 @@ class AdsTxtCrawler:
         LOG.info('Databases bootstrapped...')
 
         while True:
+            loop_start = time.time()
             LOG.info('Searching for domains to crawl...')
             self._run_once()
             LOG.info('Done processing current available domains.')
-            # There's no sleeping as this process takes ages.
-            # Just loop round and update anything that's required.
+            # If the loop instantly returned, sleep for a while so
+            # we don't thrash the database.
+            if time.time() - loop_start < 60:
+                time.sleep(15)
