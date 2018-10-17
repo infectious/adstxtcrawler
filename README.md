@@ -26,6 +26,13 @@ adstxt --file --file_path=/tmp/adstxt_domains
 ```
 
 This will start up the crawler, using the file argument and the specified path.
+This path may contain a wildcard as supported by the glob syntax.
+
+```sh
+adstxt --file --file_path=/tmp/target_domains/*
+```
+
+For example would match through all files found in the target_domains directory.
 
 The first time this runs depending upon the size of the list of domains this
 may take in the hours to write fetched data into MySQL.

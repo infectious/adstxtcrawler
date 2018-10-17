@@ -1,13 +1,14 @@
+"""Main Business logic of AdsTxtCrawler."""
 import asyncio
 import datetime
+import glob
 import json
 import logging
 import queue
 import threading
-from typing import List
+from typing import List, Optional
 
 from elasticsearch import Elasticsearch
-
 from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError, DBAPIError
 from sqlalchemy.orm import sessionmaker
@@ -24,14 +25,33 @@ LOG = logging.getLogger(__name__)
 class AdsTxtCrawler:
 
     def __init__(self,
-                 es,
-                 file,
-                 db_uri,
-                 es_uri=None,
-                 es_query=None,
-                 es_index=None,
-                 file_uri=None,
-                 crawler_id=None):
+                 es: bool,
+                 file: bool,
+                 db_uri: str,
+                 es_uri: Optional[str]=None,
+                 es_query: Optional[str]=None,
+                 es_index: Optional[str]=None,
+                 file_uri: Optional[str]=None,
+                 crawler_id: Optional[str]=None) -> None:
+        """Initialise an Adstxt crawler.
+
+        Args:
+            es (bool): Elasticsearch as the main data source boolean.
+            file (bool): Files as the main data source boolean.
+            db_uri (str): Database URI used to write back collected data.
+
+        Kwargs:
+            es_uri (str): Hostname of elasticsearch server.
+            es_query (str): Stringified JSON query for elasticsearch server.
+            es_index (str): ES index to query (accepts wildcards).
+            file_uri (str): Path to files when using file as the data source
+                (accepts globs).
+            crawler_id (str): Crawler ID to use as user-agent.  Recommended that
+                this does not include the words 'bot' or 'crawler'.
+
+        Returns:
+            None
+        """
         self.es = es
         self.file = file
         self.db_uri = db_uri
@@ -42,7 +62,7 @@ class AdsTxtCrawler:
         self.crawler_id = crawler_id
         self._session = sessionmaker()
         self._testing = False
-        self.es = Elasticsearch(self.es_uri)
+        self.client = Elasticsearch(self.es_uri)
 
     def _get_engine(self):
         if 'mysql+pymysql' in self.db_uri:
@@ -76,6 +96,14 @@ class AdsTxtCrawler:
         self._session = session
 
     def _last_updated_at(self, domain: str) -> datetime.datetime:
+        """Check to see the datetime that a record was last updated at.
+
+        Args:
+            domain (str): domain to check.
+
+        Returns:
+            datetime.datetime: Value of last fetch for domain.
+        """
         session = self._session()
 
         # Check to see if the domain is present in the domains table.
@@ -283,25 +311,47 @@ class AdsTxtCrawler:
         LOG.debug('Session commited and domain processed.')
 
     def fetch_domains(self) -> List[str]:
+        """Fetch a list of domains to scan.
+
+        Args:
+            None
+
+        Returns:
+            List[str]: Domain list to scan.
+        """
         if self.file:
             return self._fetch_from_file(self.file_uri)
         else:
             return self._query_for_domains(self.es_index, self.es_query)
 
     def _fetch_from_file(self, path) -> List[str]:
-        with open(path, 'r') as f:
-            domain_file = f.read()
+        """Fetch a list of domains from file from the chosen path.
+
+        Args:
+            path (str): string path to glob on.
+
+        Returns:
+            List[str]: Domain list.
+        """
+        files = glob.glob(path)
+
+        LOG.debug('Found %r files with glob match.', files)
 
         domains = []
-        for row in domain_file.split('\n'):
-            if row:
-                domains.append(row)
+        for file in files:
+            with open(file, 'r') as f:
+                domain_file = f.read()
 
+            for row in domain_file.split('\n'):
+                if row:
+                    domains.append(row)
+
+        LOG.debug('Found %s domains from %s files.', len(domains), len(files))
         return domains
 
     def _query_for_domains(self, index, body) -> List[str]:
         query = json.loads(body)
-        res = self.es.search(index=index, body=query)
+        res = self.client.search(index=index, body=query)
 
         # Return just the domains.
         domains = [i['key'] for i

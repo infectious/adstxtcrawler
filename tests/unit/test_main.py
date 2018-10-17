@@ -10,6 +10,9 @@ import adstxt.main as main
 import adstxt.models as models
 
 
+log = logging.getLogger(__name__)
+
+
 BROKEN_FETCH_SENTRY_1023 = FetchResponse(
     'weather.com',
     datetime.datetime(2018, 3, 26, 10, 55, 59, 661410),
@@ -32,11 +35,6 @@ BROKEN_FETCH_SENTRY_1023 = FetchResponse(
         'facebook.com, 124523452, DIRECT'
     )
 )
-
-
-DUMMY_DOMAIN_LIST = """reddit.com
-dailymail.co.uk
-ebay.co.uk"""
 
 
 @pytest.fixture(scope='function')
@@ -116,7 +114,7 @@ def test_check_viability_bad_domain(adstxtcrawler, mocker):
 def test_query_domains(adstxtcrawler, mocker, caplog):
     caplog.set_level(logging.INFO)
 
-    mock_es = mocker.patch.object(adstxtcrawler.es, 'search')
+    mock_es = mocker.patch.object(adstxtcrawler.client, 'search')
     mock_es.return_value = {
         'aggregations': {'top_domains': {'buckets': [{'key': 'foo.com'}]}}}
 
@@ -160,14 +158,43 @@ def test_fetch_domains_es(adstxtcrawler, mocker):
     mock_domains.assert_called_once_with(es_index, es_query)
 
 
-def test_fetch_from_file(adstxtcrawler, tmpdir):
-    domains_file = tmpdir.join("domains")
-    domains_file.write(DUMMY_DOMAIN_LIST)
+def test_fetch_from_file_rewrites(adstxtcrawler, tmpdir, caplog):
+    caplog.set_level(logging.DEBUG)
 
-    expected_domains = DUMMY_DOMAIN_LIST.split('\n')
-    domains = adstxtcrawler._fetch_from_file(domains_file.strpath)
+    first_domain_list = ["reddit.com", "dailymail.co.uk", "ebay.co.uk"]
+    domains_file = tmpdir.join("domains.txt")
+    domains_file.write('\n'.join(first_domain_list))
 
-    assert expected_domains == domains
+    assert adstxtcrawler._fetch_from_file(
+        domains_file.strpath) == first_domain_list
+
+    log.debug(domains_file.strpath)
+
+    # We now need to check that any updates are processed.
+    second_domain_list = first_domain_list + ['infectiousmedia.com']
+    domains_file.write('\n'.join(second_domain_list))
+
+    log.debug('Writing %r', second_domain_list)
+    log.debug(domains_file.strpath)
+    assert adstxtcrawler._fetch_from_file(
+        domains_file.strpath) == second_domain_list
+
+
+def test_fetch_from_file_glob(adstxtcrawler, tmpdir, caplog):
+    caplog.set_level(logging.DEBUG)
+
+    first_domain_list = ["reddit.com", "dailymail.co.uk", "ebay.co.uk"]
+    second_domain_list = ["infectiousmedia.com", "facebook.com"]
+
+    domains_file_first = tmpdir.join("domains.1")
+    domains_file_first.write('\n'.join(first_domain_list))
+    domains_file_second = tmpdir.join("domains.2")
+    domains_file_second.write('\n'.join(second_domain_list))
+
+    glob_path = domains_file_first.strpath.split('.')[0] + '*'
+
+    assert adstxtcrawler._fetch_from_file(
+        glob_path) == first_domain_list + second_domain_list
 
 
 def test_deactivate_reactivate(adstxtcrawler, caplog):
@@ -262,7 +289,7 @@ def test_deactivate_reactivate_new_cert_authority(adstxtcrawler, caplog):
         datetime.datetime(2018, 3, 26, 10, 55, 59, 661410),
         True,
         (
-            # Note the aamazon-adsystem...
+            # amazon-adsystem has been removed so old record should be inactive
             'blah.com, 1111, DIRECT',
         )
     )
@@ -271,6 +298,7 @@ def test_deactivate_reactivate_new_cert_authority(adstxtcrawler, caplog):
         datetime.datetime(2018, 3, 26, 10, 55, 59, 661410),
         True,
         (
+            # New record with new cert_authority.
             'amazon-adsystem.com, 1004, DIRECT, asdasdasd',
         )
     )
